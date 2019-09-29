@@ -1,5 +1,5 @@
 import torch
-from .Layers import SelfAttention, PositionwiseFeedForward, PositionalEncoding
+from .Layers import SelfAttention, PositionwiseFeedForward, PositionalEncoding, SublayerConnection
 
 class Decoder(torch.nn.Module):
     """ Transformer decoder model. """
@@ -40,9 +40,10 @@ class DecoderLayer(torch.nn.Module):
         self.self_attn = SelfAttention() # TODO use mask
         self.pwff = PositionwiseFeedForward()
         self.layer_norm = torch.nn.LayerNorm()
+        self.sublayer_connections = [SublayerConnection(dm) for _ in range(3)]
 
     def forward(self, dec_layer_input, enc_output):
-        dec_output = dec_layer_input + self.self_attn(self.layer_norm(dec_layer_input))        # Self-attn
-        dec_output = dec_output + self.layer_norm(self.enc_dec_attn(dec_output, enc_output))   # Enc/dec-attn
-        dec_output =  dec_output + self.layer_norm(self.pwff(dec_output))                      # Feed forward
+        dec_output = self.sublayer_connections[0](dec_layer_input, self.self_attn)
+        dec_output = self.sublayer_connections[1](dec_output, self.enc_dec_attn)
+        dec_output = self.sublayer_connections[2](dec_output, self.pwff)
         return dec_output
