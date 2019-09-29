@@ -4,7 +4,7 @@ from .Layers import SelfAttention, PositionwiseFeedForward, PositionalEncoding
 class Decoder(torch.nn.Module):
     """ Transformer decoder model. """
 
-    def __init__(self, dm, dq, dk, dv, dff, dout, n_dec_layers):
+    def __init__(self, dout, dm, dq, dk, dv, dff, n_dec_layers):
         super(Decoder, self).__init__()
         self.dm = dm
         self.dq = dq

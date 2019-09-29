@@ -4,7 +4,7 @@ from .Layers import SelfAttention, PositionwiseFeedForward, PositionalEncoding
 class Encoder(torch.nn.Module):
     """ Transformer encoder model. """
 
-    def __init__(self, din, dm, dq, dk, dv, dff, n_enc_layers, vocab_size):
+    def __init__(self, din, dm, dq, dk, dv, dff, n_enc_layers):
         super(Encoder, self).__init__()
         self.din = din
         self.dm = dm
@@ -12,10 +12,9 @@ class Encoder(torch.nn.Module):
         self.dk = dk
         self.dv = dv
         self.dff = dff
-        self.vocab_size = vocab_size
         self.n_enc_layers = n_enc_layers
 
-        self.input_embedding = torch.nn.Embedding(self.vocab_size, self.dm)
+        self.input_embedding = torch.nn.Embedding(self.din, self.dm)
         self.positional_enc = PositionalEncoding()
         self.self_attn = SelfAttention()
         self.pwff = PositionwiseFeedForward()
