@@ -23,9 +23,9 @@ class Transformer(torch.nn.Module):
         self.output_projection = torch.nn.Linear(dm, dout)
         self.output_softmax = torch.nn.Softmax()
 
-    def forward(self, src_seq, tgt_seq):
-        enc_output, enc_attn = Encoder(src_seq)
-        dec_output = Decoder(tgt_seq, enc_output, enc_attn)
+    def forward(self, enc_input, dec_input):
+        enc_output, enc_attn = Encoder(enc_input)
+        dec_output = Decoder(dec_input, enc_output, enc_attn)
         logits = self.output_projection(dec_output)
         return self.output_softmax(logits)
 
