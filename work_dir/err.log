@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "nmt.py", line 57, in <module>
+    class NMT(object):
+  File "nmt.py", line 69, in NMT
+    def __call__(self, src_sents: List[List[str]], tgt_sents: List[List[str]]) -> Tensor:
+NameError: name 'Tensor' is not defined
