@@ -13,7 +13,7 @@ work_dir="work_dir"
 mkdir -p ${work_dir}
 echo save results to ${work_dir}
 
-/Users/jonathanking/anaconda3/envs/nmt/bin/python nmt.py \
+python nmt.py \
     train \
     --cuda \
     --vocab ${vocab} \
@@ -31,7 +31,7 @@ echo save results to ${work_dir}
     --clip-grad 5.0 \
     --lr-decay 0.5 2>${work_dir}/err.log
 
-/Users/jonathanking/anaconda3/envs/nmt/bin/python nmt.py \
+python nmt.py \
     decode \
     --cuda \
     --beam-size 5 \

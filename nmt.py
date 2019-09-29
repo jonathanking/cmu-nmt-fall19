@@ -66,7 +66,7 @@ class NMT(object):
 
         # initialize neural network layers...
 
-    def __call__(self, src_sents: List[List[str]], tgt_sents: List[List[str]]) -> Tensor:
+    def __call__(self, src_sents: List[List[str]], tgt_sents: List[List[str]]):
         """
         take a mini-batch of source and target sentences, compute the log-likelihood of 
         target sentences.
