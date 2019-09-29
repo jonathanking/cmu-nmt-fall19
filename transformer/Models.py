@@ -23,8 +23,8 @@ class Transformer(torch.nn.Module):
         self.output_softmax = torch.nn.Softmax()
 
     def forward(self, enc_input, dec_input):
-        enc_output, enc_attn = Encoder(enc_input)
-        dec_output = Decoder(dec_input, enc_output, enc_attn)
+        enc_output, enc_attn = self.encoder(enc_input)
+        dec_output = self.decoder(dec_input, enc_output, enc_attn)
         logits = self.output_projection(dec_output)
         return self.output_softmax(logits)
 
