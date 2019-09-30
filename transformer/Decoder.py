@@ -1,5 +1,5 @@
 import torch
-from .Layers import PositionwiseFeedForward, PositionalEncoding, SublayerConnection
+from .Sublayers import PositionwiseFeedForward, PositionalEncoding, SublayerConnection
 from .Attention import MultiHeadedAttention, subsequent_mask
 
 class Decoder(torch.nn.Module):
@@ -36,7 +36,6 @@ class DecoderLayer(torch.nn.Module):
 
         self.self_attn = MultiHeadedAttention(dm, n_heads)
         self.pwff = PositionwiseFeedForward(dm, dff)
-        self.layer_norm = torch.nn.LayerNorm(dm)
         self.sublayer_connections = [SublayerConnection(dm) for _ in range(3)]
 
     def forward(self, dec_layer_input, enc_output):

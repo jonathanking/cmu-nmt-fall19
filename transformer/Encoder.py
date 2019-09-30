@@ -1,5 +1,5 @@
 import torch
-from .Layers import PositionwiseFeedForward, PositionalEncoding, SublayerConnection
+from .Sublayers import PositionwiseFeedForward, PositionalEncoding, SublayerConnection
 from .Attention import MultiHeadedAttention
 
 class Encoder(torch.nn.Module):
@@ -38,7 +38,6 @@ class EncoderLayer(torch.nn.Module):
 
         self.self_attn = MultiHeadedAttention(dm, n_heads)
         self.pwff = PositionwiseFeedForward(dm, dff)
-        self.layer_norm = torch.nn.LayerNorm(dm)
         self.sublayer_connections = [SublayerConnection(dm) for _ in range(2)]
 
     def forward(self, enc_layer_input):
