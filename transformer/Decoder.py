@@ -5,7 +5,7 @@ from .Attention import MultiHeadedAttention
 class Decoder(torch.nn.Module):
     """ Transformer decoder model. """
 
-    def __init__(self, dout, dm, dff, n_heads, n_dec_layers):
+    def __init__(self, dout, dm, dff, n_heads, n_dec_layers, max_seq_len):
         super(Decoder, self).__init__()
         self.dout = dout
         self.dm = dm
@@ -13,7 +13,7 @@ class Decoder(torch.nn.Module):
         self.n_heads = n_heads
         self.n_dec_layers = n_dec_layers
 
-        self.positional_enc = PositionalEncoding()
+        self.positional_enc = PositionalEncoding(dm, max_seq_len)
         self.input_embedding = torch.nn.Embedding(self.dout, self.dm)
         self.dec_layers = [DecoderLayer(dm, dff, n_heads) for _ in self.n_dec_layers]
 
@@ -35,7 +35,7 @@ class DecoderLayer(torch.nn.Module):
         self.n_heads = n_heads
 
         self.self_attn = MultiHeadedAttention(dm, n_heads)
-        self.pwff = PositionwiseFeedForward()
+        self.pwff = PositionwiseFeedForward(dm, dff)
         self.layer_norm = torch.nn.LayerNorm(dm)
         self.sublayer_connections = [SublayerConnection(dm) for _ in range(3)]
 
