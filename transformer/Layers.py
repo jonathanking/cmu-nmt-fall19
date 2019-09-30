@@ -24,8 +24,20 @@ class SublayerConnection(torch.nn.Module):
 
 class PositionwiseFeedForward(torch.nn.Module):
     """ Position-wise Feed Forward network sublayer for the Transformer model. """
-    def __init__(self):
+    def __init__(self, dm, dh):
         super(PositionwiseFeedForward, self).__init__()
+        self.dm = dm
+        self.dh = dh
+        self.layer1 = torch.nn.Linear(dm, dh)
+        self.layer2 = torch.nn.Linear(dh, dm)
+        self.relu = torch.nn.ReLU()
+        # TODO: is this implementation with linear layers accurate?
+        # self.conv1d_1 = torch.nn.conv1d(dm, dh)
+        # self.conv1d_2 = torch.nn.conv1d(dh, dm)
+
+    def forward(self, input_seq):
+        return self.layer2(self.relu(self.layer1(input_seq)))
+
 
 class PositionalEncoding(torch.nn.Module):
     """ Positional encoding layer for the Transformer model. """

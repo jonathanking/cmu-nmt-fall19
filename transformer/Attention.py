@@ -41,10 +41,11 @@ class MultiHeadedAttention(torch.nn.Module):
         n_batch = input_seq.shape[0]
         Q, K, V = self.wq(input_seq), self.wk(input_seq), self.wv(input_seq)
 
-        # Split into heads, being careful to keep batch, head dims in front of L and dk.
+        # Split into heads, being careful to keep batch, head dims in front of L and dk dims.
         # Q                         = [ n_batch x L x dm ] = [ n_batch x L x (n_heads * dk) ]
         # Q.view                    = [ n_batch x L x n_heads x dk ]
         # Q.transpose               = [ n_batch x n_heads x L x dk ]
+        # TODO why no contiguous here?
         Q, K, V = (x.view(n_batch, -1, self.n_heads, self.dk).transpose(1, 2) for x in (Q, K, V))
 
         # Apply scaled dot-product attention across batch, head dims. Add head dim to mask for broadcasting.
@@ -56,7 +57,8 @@ class MultiHeadedAttention(torch.nn.Module):
         # attn_output.transpose     = [ n_batch x L x n_heads x dk ]
         # attn_output.contiguous    = [ (n_batch * L * n_heads * dk) ]
         # attn_output.view          = [ n_batch x L x dm ]
-        # Because transpose is a view operation, we call contiguous to be sure our next view operation is valid
+        # Because transpose is a view operation, we call contiguous to be sure our next view operation is valid.
+        # See https://stackoverflow.com/questions/48915810/pytorch-contiguous for notes.
         attn_output = attn_output.transpose(1, 2).contiguous().view(n_batch, -1, self.dm)
         return self.wo(attn_output)
 
