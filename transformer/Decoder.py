@@ -1,6 +1,6 @@
 import torch
 from .Layers import PositionwiseFeedForward, PositionalEncoding, SublayerConnection
-from .Attention import MultiHeadedAttention
+from .Attention import MultiHeadedAttention, subsequent_mask
 
 class Decoder(torch.nn.Module):
     """ Transformer decoder model. """
@@ -40,7 +40,9 @@ class DecoderLayer(torch.nn.Module):
         self.sublayer_connections = [SublayerConnection(dm) for _ in range(3)]
 
     def forward(self, dec_layer_input, enc_output):
-        dec_output = self.sublayer_connections[0](dec_layer_input, self.self_attn)
+        # TODO finish implementing dec/enc attention
+        mask = subsequent_mask(dec_layer_input.shape[1])
+        dec_output = self.sublayer_connections[0](dec_layer_input, lambda x: self.self_attn(x, mask=mask))
         dec_output = self.sublayer_connections[1](dec_output, lambda x: self.enc_dec_attn(enc_output, x))
         dec_output = self.sublayer_connections[2](dec_output, self.pwff)
         return dec_output

@@ -1,13 +1,5 @@
 import torch
-import torch.nn.functional as F
 import numpy as np
-
-
-def subsequent_mask(length):
-    """ Returns a mask such that for position i, all positions i+1 ... dim are masked. """
-    shape = (1, length, length)
-    mask = 1 - np.triu(np.ones(shape), k=1)
-    return torch.from_numpy(mask).bool()
 
 
 class SublayerConnection(torch.nn.Module):
