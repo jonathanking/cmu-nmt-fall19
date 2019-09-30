@@ -1,28 +1,6 @@
 import torch
 import numpy as np
 
-class SelfAttention(torch.nn.Module):
-    """ Self-attn module for Transformer. """
-    def __init__(self, dm, dq, dk, dv):
-        super(SelfAttention, self).__init__()
-        self.dm = dm
-        self.dq = dq
-        self.dk = dk
-        self.dv = dv
-
-        self.q_embedding = torch.nn.Linear(dm, dq)
-        self.k_embedding = torch.nn.Linear(dm, dk)
-        self.v_embedding = torch.nn.Linear(dm, dv)
-
-        self.softmax = torch.nn.Softmax(dim=-1)
-
-    def forward(self, input_seq):
-        Q, K, V = self.q_embedding(input_seq), self.k_embedding(input_seq), self.v_embedding(input_seq)
-        scores = Q.bmm(K.transpose(1, 2))
-        scores = self.softmax(scores / np.sqrt(self.dk))
-        scores = scores.bmm(V)
-        return scores
-
 class ScaledDotProductAttention(torch.nn.Module):
     """ Scaled, softmax attention module for Transformer as defined by Attention(Q, K, V) on pg 4.
         Returns the final attention vectors as well as the attention matrices (pairwise scores). """

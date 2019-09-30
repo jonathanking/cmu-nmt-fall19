@@ -1,22 +1,21 @@
 import torch
-from .Layers import SelfAttention, PositionwiseFeedForward, PositionalEncoding, SublayerConnection
+from .Layers import PositionwiseFeedForward, PositionalEncoding, SublayerConnection
+from .Attention import MultiHeadedAttention
 
 class Decoder(torch.nn.Module):
     """ Transformer decoder model. """
 
-    def __init__(self, dout, dm, dq, dk, dv, dff, n_dec_layers):
+    def __init__(self, dout, dm, dff, n_heads, n_dec_layers):
         super(Decoder, self).__init__()
-        self.dm = dm
-        self.dq = dq
-        self.dk = dk
-        self.dv = dv
-        self.dff = dff
         self.dout = dout
+        self.dm = dm
+        self.dff = dff
+        self.n_heads = n_heads
         self.n_dec_layers = n_dec_layers
 
         self.positional_enc = PositionalEncoding()
         self.input_embedding = torch.nn.Embedding(self.dout, self.dm)
-        self.dec_layers = [DecoderLayer(dm, dq, dk, dv, dff) for _ in self.n_dec_layers]
+        self.dec_layers = [DecoderLayer(dm, dff, n_heads) for _ in self.n_dec_layers]
 
     def forward(self, dec_input, enc_output):
         dec_output = self.input_embedding(dec_input)
@@ -29,21 +28,19 @@ class Decoder(torch.nn.Module):
 class DecoderLayer(torch.nn.Module):
     """ Transformer decoder layer. """
 
-    def __init__(self, dm, dq, dk, dv, dff):
+    def __init__(self, dm, dff, n_heads):
         super(DecoderLayer, self).__init__()
         self.dm = dm
-        self.dq = dq
-        self.dk = dk
-        self.dv = dv
         self.dff = dff
+        self.n_heads = n_heads
 
-        self.self_attn = SelfAttention() # TODO use mask
+        self.self_attn = MultiHeadedAttention(dm, n_heads)
         self.pwff = PositionwiseFeedForward()
-        self.layer_norm = torch.nn.LayerNorm()
+        self.layer_norm = torch.nn.LayerNorm(dm)
         self.sublayer_connections = [SublayerConnection(dm) for _ in range(3)]
 
     def forward(self, dec_layer_input, enc_output):
         dec_output = self.sublayer_connections[0](dec_layer_input, self.self_attn)
-        dec_output = self.sublayer_connections[1](dec_output, self.enc_dec_attn)
+        dec_output = self.sublayer_connections[1](dec_output, lambda x: self.enc_dec_attn(enc_output, x))
         dec_output = self.sublayer_connections[2](dec_output, self.pwff)
         return dec_output

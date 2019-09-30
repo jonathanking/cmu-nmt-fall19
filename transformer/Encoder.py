@@ -1,25 +1,22 @@
 import torch
-from .Layers import SelfAttention, PositionwiseFeedForward, PositionalEncoding, SublayerConnection
+from .Layers import PositionwiseFeedForward, PositionalEncoding, SublayerConnection
+from .Attention import MultiHeadedAttention
 
 class Encoder(torch.nn.Module):
     """ Transformer encoder model. """
 
-    def __init__(self, din, dm, dq, dk, dv, dff, n_enc_layers):
+    def __init__(self, din, dm, dff, n_heads, n_enc_layers):
         super(Encoder, self).__init__()
         self.din = din
         self.dm = dm
-        self.dq = dq
-        self.dk = dk
-        self.dv = dv
         self.dff = dff
+        self.n_heads = n_heads
         self.n_enc_layers = n_enc_layers
 
         self.input_embedding = torch.nn.Embedding(self.din, self.dm)
         self.positional_enc = PositionalEncoding()
-        self.self_attn = SelfAttention()
-        self.pwff = PositionwiseFeedForward()
 
-        self.enc_layers = [EncoderLayer(dm, dq, dk, dv, dff) for _ in self.n_enc_layers]
+        self.enc_layers = [EncoderLayer(dm, dff) for _ in self.n_enc_layers]
 
     def forward(self, src_seq):
         enc_output = self.input_embedding(src_seq)
@@ -32,17 +29,15 @@ class Encoder(torch.nn.Module):
 class EncoderLayer(torch.nn.Module):
     """ Transformer encoder layer. """
 
-    def __init__(self, dm, dq, dk, dv, dff):
+    def __init__(self, dm, dff, n_heads):
         super(EncoderLayer, self).__init__()
         self.dm = dm
-        self.dq = dq
-        self.dk = dk
-        self.dv = dv
         self.dff = dff
+        self.n_heads = n_heads
 
-        self.self_attn = SelfAttention()
+        self.self_attn = MultiHeadedAttention(dm, n_heads)
         self.pwff = PositionwiseFeedForward()
-        self.layer_norm = torch.nn.LayerNorm()
+        self.layer_norm = torch.nn.LayerNorm(dm)
         self.sublayer_connections = [SublayerConnection(dm) for _ in range(2)]
 
     def forward(self, enc_layer_input):
