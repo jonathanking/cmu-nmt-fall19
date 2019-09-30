@@ -32,7 +32,9 @@ class PositionwiseFeedForward(torch.nn.Module):
 
 
 class PositionalEncoding(torch.nn.Module):
-    """ Positional encoding layer for the Transformer model. """
+    """ Positional encoding layer for the Transformer model.
+    # TODO I think jalammar's position encoding viz is wrong. It doesn't alternate sin/cos.
+    """
     def __init__(self, dm, max_seq_len):
         super(PositionalEncoding, self).__init__()
         self.dm = dm
