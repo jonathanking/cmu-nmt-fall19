@@ -9,13 +9,11 @@ class ScaledDotProductAttention(torch.nn.Module):
         self.softmax = torch.nn.Softmax(dim=-1)
 
     def forward(self, Q, K, V, mask=None):
-        # scores = Q.bmm(K.transpose(-2, -1))
         scores = torch.matmul(Q, K.transpose(-2, -1))
         scores = scores / np.sqrt(K.shape[-1])
         if mask:
             scores = scores.masked_fill(mask, -np.inf)
         scores = self.softmax(scores)
-        # return scores.bmm(V), scores
         return torch.matmul(scores, V), scores
 
 class MultiHeadedAttention(torch.nn.Module):
@@ -37,9 +35,9 @@ class MultiHeadedAttention(torch.nn.Module):
         self.attn_scores = None
         self.attn = ScaledDotProductAttention()
 
-    def forward(self, input_seq, mask=None):
-        n_batch = input_seq.shape[0]
-        Q, K, V = self.wq(input_seq), self.wk(input_seq), self.wv(input_seq)
+    def forward(self, preQ, preK, preV, mask=None):
+        n_batch = preQ.shape[0]
+        Q, K, V = self.wq(preQ), self.wk(preK), self.wv(preV)
 
         # Split into heads, being careful to keep batch, head dims in front of L and dk dims.
         # Q                         = [ n_batch x L x dm ] = [ n_batch x L x (n_heads * dk) ]

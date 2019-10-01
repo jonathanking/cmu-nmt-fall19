@@ -19,11 +19,11 @@ class Encoder(torch.nn.Module):
 
         self.enc_layers = [EncoderLayer(dm, dff, n_heads) for _ in self.n_enc_layers]
 
-    def forward(self, src_seq):
+    def forward(self, src_seq, src_mask):
         enc_output = self.input_embedding(src_seq)
         enc_output = enc_output + self.positional_enc(enc_output)
         for enc_layer in self.enc_layers:
-            enc_output = enc_layer(enc_output)
+            enc_output = enc_layer(enc_output, src_mask)
         return enc_output
 
 
@@ -40,7 +40,7 @@ class EncoderLayer(torch.nn.Module):
         self.pwff = PositionwiseFeedForward(dm, dff)
         self.sublayer_connections = [SublayerConnection(dm) for _ in range(2)]
 
-    def forward(self, enc_layer_input):
-        enc_output = self.sublayer_connections[0](enc_layer_input, self.self_attn)
+    def forward(self, enc_input, enc_input_mask):
+        enc_output = self.sublayer_connections[0](enc_input, lambda x: self.self_attn(x, x, x, mask=enc_input_mask))
         enc_output = self.sublayer_connections[1](enc_output, self.pwff)
         return enc_output

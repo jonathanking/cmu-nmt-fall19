@@ -17,11 +17,11 @@ class Decoder(torch.nn.Module):
         self.input_embedding = torch.nn.Embedding(self.dout, self.dm)
         self.dec_layers = [DecoderLayer(dm, dff, n_heads) for _ in self.n_dec_layers]
 
-    def forward(self, dec_input, enc_output):
+    def forward(self, dec_input, enc_output, tgt_mask, src_mask):
         dec_output = self.input_embedding(dec_input)
         dec_output = dec_output + self.positional_enc(dec_output)
         for dec_layer in self.dec_layers:
-            dec_output = dec_layer(dec_output, enc_output)
+            dec_output = dec_layer(dec_output, enc_output, tgt_mask, src_mask)
         return dec_output
 
 
@@ -35,13 +35,12 @@ class DecoderLayer(torch.nn.Module):
         self.n_heads = n_heads
 
         self.self_attn = MultiHeadedAttention(dm, n_heads)
+        self.src_attn = MultiHeadedAttention(dm, n_heads)
         self.pwff = PositionwiseFeedForward(dm, dff)
         self.sublayer_connections = [SublayerConnection(dm) for _ in range(3)]
 
-    def forward(self, dec_layer_input, enc_output):
-        # TODO finish implementing dec/enc attention
-        mask = subsequent_mask(dec_layer_input.shape[1])
-        dec_output = self.sublayer_connections[0](dec_layer_input, lambda x: self.self_attn(x, mask=mask))
-        dec_output = self.sublayer_connections[1](dec_output, lambda x: self.enc_dec_attn(enc_output, x))
+    def forward(self, dec_input, enc_output, tgt_mask, src_mask):
+        dec_output = self.sublayer_connections[0](dec_input, lambda x: self.self_attn(x, x, x, mask=tgt_mask))
+        dec_output = self.sublayer_connections[1](dec_output, lambda x: self.src_attn(x, enc_output, enc_output, mask=src_mask))
         dec_output = self.sublayer_connections[2](dec_output, self.pwff)
         return dec_output
