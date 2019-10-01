@@ -6,6 +6,7 @@ from .Attention import subsequent_mask
 
 class Transformer(torch.nn.Module):
     """ Transformer based model. """
+    # TODO implement dropout for all layers
 
     def __init__(self, dm, dff, vocab_size, n_heads, n_enc_layers, n_dec_layers, max_seq_len, pad_char):
         super(Transformer, self).__init__()
