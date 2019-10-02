@@ -49,10 +49,18 @@ from nltk.translate.bleu_score import corpus_bleu, sentence_bleu, SmoothingFunct
 
 from utils import read_corpus, batch_iter
 from vocab import Vocab, VocabEntry
+sys.path.append("/transformer/")
+from transformer.Transformer import Transformer
+import torch
 
 
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
+MAXLEN = 500
+PAD = 0
 
+def get_onehot(ints, dim):
+    y = torch.eye(dim).long()
+    return y[ints]
 
 class NMT(object):
 
@@ -64,7 +72,8 @@ class NMT(object):
         self.dropout_rate = dropout_rate
         self.vocab = vocab
 
-        # initialize neural network layers...
+        self.model = Transformer(embed_size, hidden_size, len(vocab.src.word2id), len(vocab.tgt.word2id), n_heads=8, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD)
+
 
     def __call__(self, src_sents: List[List[str]], tgt_sents: List[List[str]]):
         """
@@ -80,43 +89,20 @@ class NMT(object):
                 log-likelihood of generating the gold-standard target sentence for 
                 each example in the input batch
         """
-        src_encodings, decoder_init_state = self.encode(src_sents, tgt_sents)
-        scores = self.decode(src_encodings, decoder_init_state, tgt_sents)
+        src_idxs = self.vocab.src.words2indices(src_sents, MAXLEN)
+        tgt_idxs = self.vocab.tgt.words2indices(tgt_sents, MAXLEN)
+        src_sents_oh = torch.LongTensor(src_idxs)
+        tgt_sents_oh = torch.LongTensor(tgt_idxs)
+        output = self.model(src_sents_oh, tgt_sents_oh[:, :-1])
+        log_output = torch.log(output)
+        probs = torch.zeros(output.shape[0])
+        for i in range(output.shape[1]): # iterate through sequence dim
+            tgt_wrds = tgt_sents_oh[:,i]
+            tgt_ll = log_output[:,i, tgt_wrds][:,0]
+            probs += tgt_ll
 
-        return scores
+        return probs
 
-    def encode(self, src_sents: List[List[str]]) -> Tuple[Tensor, Any]:
-        """
-        Use a GRU/LSTM to encode source sentences into hidden states
-
-        Args:
-            src_sents: list of source sentence tokens
-
-        Returns:
-            src_encodings: hidden states of tokens in source sentences, this could be a variable 
-                with shape (batch_size, source_sentence_length, encoding_dim), or in orther formats
-            decoder_init_state: decoder GRU/LSTM's initial state, computed from source encodings
-        """
-
-        return src_encodings, decoder_init_state
-
-    def decode(self, src_encodings: Tensor, decoder_init_state: Any, tgt_sents: List[List[str]]) -> Tensor:
-        """
-        Given source encodings, compute the log-likelihood of predicting the gold-standard target
-        sentence tokens
-
-        Args:
-            src_encodings: hidden states of tokens in source sentences
-            decoder_init_state: decoder GRU/LSTM's initial state
-            tgt_sents: list of gold-standard target sentences, wrapped by `<s>` and `</s>`
-
-        Returns:
-            scores: could be a variable of shape (batch_size, ) representing the 
-                log-likelihood of generating the gold-standard target sentence for 
-                each example in the input batch
-        """
-
-        return scores
 
     def beam_search(self, src_sent: List[str], beam_size: int=5, max_decoding_time_step: int=70) -> List[Hypothesis]:
         """
@@ -132,10 +118,11 @@ class NMT(object):
                 value: List[str]: the decoded target sentence, represented as a list of words
                 score: float: the log-likelihood of the target sentence
         """
+        pass
 
-        return hypotheses
+        # return hypotheses
 
-    def evaluate_ppl(self, dev_data: List[Any], batch_size: int=32):
+    def evaluate_ppl(self, dev_data, batch_size: int=32):
         """
         Evaluate perplexity on dev sentences
 
@@ -154,12 +141,14 @@ class NMT(object):
         # by the NN library to signal the backend to not to keep gradient information
         # e.g., `torch.no_grad()`
 
-        for src_sents, tgt_sents in batch_iter(dev_data, batch_size):
-            loss = -model(src_sents, tgt_sents).sum()
+        with torch.no_grad():
 
-            cum_loss += loss
-            tgt_word_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting the leading `<s>`
-            cum_tgt_words += tgt_word_num_to_predict
+            for src_sents, tgt_sents in batch_iter(dev_data, batch_size):
+                loss = -self.model(src_sents, tgt_sents[:,:-1]).sum()
+
+                cum_loss += loss
+                tgt_word_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting the leading `<s>`
+                cum_tgt_words += tgt_word_num_to_predict
 
         ppl = np.exp(cum_loss / cum_tgt_words)
 
@@ -173,8 +162,9 @@ class NMT(object):
         Returns:
             model: the loaded model
         """
+        raise NotImplementedError()
 
-        return model
+        # return model
 
     def save(self, path: str):
         """
@@ -245,8 +235,8 @@ def train(args: Dict[str, str]):
             # (batch_size)
             loss = -model(src_sents, tgt_sents)
 
-            report_loss += loss
-            cum_loss += loss
+            report_loss += loss.sum()
+            cum_loss += loss.sum()
 
             tgt_words_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting leading `<s>`
             report_tgt_words += tgt_words_num_to_predict

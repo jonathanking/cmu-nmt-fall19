@@ -60,9 +60,10 @@ class VocabEntry(object):
         else:
             return self[word]
 
-    def words2indices(self, sents):
+    def words2indices(self, sents, maxlen):
+        padlen = min(max([len(s) for s in sents]), maxlen)
         if type(sents[0]) == list:
-            return [[self[w] for w in s] for s in sents]
+            return [[self[w] for w in s] + [self.word2id['<pad>']] * (padlen-len(s)) for s in sents]
         else:
             return [self[w] for w in sents]
 
