@@ -17,7 +17,7 @@ class Encoder(torch.nn.Module):
         self.input_embedding = torch.nn.Embedding(self.din, self.dm)
         self.positional_enc = PositionalEncoding(dm, max_seq_len)
 
-        self.enc_layers = [EncoderLayer(dm, dff, n_heads) for _ in self.n_enc_layers]
+        self.enc_layers = [EncoderLayer(dm, dff, n_heads) for _ in range(self.n_enc_layers)]
 
     def forward(self, src_seq, src_mask):
         enc_output = self.input_embedding(src_seq)
