@@ -27,7 +27,7 @@ class Transformer(torch.nn.Module):
         self.output_softmax = torch.nn.Softmax()
 
     def forward(self, enc_input, dec_input):
-        src_mask = (enc_input != self.pad_char) # TODO is this mask the right dimensionality?
+        src_mask = (enc_input != self.pad_char).unsqueeze(-2)
         tgt_mask = subsequent_mask(dec_input.shape[1])
         enc_output = self.encoder(enc_input, src_mask)
         dec_output = self.decoder(dec_input, enc_output, tgt_mask, src_mask)

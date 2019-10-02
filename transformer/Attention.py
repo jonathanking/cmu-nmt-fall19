@@ -11,8 +11,8 @@ class ScaledDotProductAttention(torch.nn.Module):
     def forward(self, Q, K, V, mask=None):
         scores = torch.matmul(Q, K.transpose(-2, -1))
         scores = scores / np.sqrt(K.shape[-1])
-        if mask:
-            scores = scores.masked_fill(mask, -np.inf)
+        if mask is not None:
+            scores = scores.masked_fill(mask == 0, -np.inf)
         scores = self.softmax(scores)
         return torch.matmul(scores, V), scores
 
@@ -48,7 +48,7 @@ class MultiHeadedAttention(torch.nn.Module):
 
         # Apply scaled dot-product attention across batch, head dims. Add head dim to mask for broadcasting.
         # attn_output               = [ n_batch x n_heads x L x dk ]
-        mask = mask.unsqueeze(1) if mask else None
+        mask = mask.unsqueeze(1) if mask is not None else None
         attn_output, self.attn_scores = self.attn(Q, K, V, mask)
 
         # Concatenate output from attn heads
