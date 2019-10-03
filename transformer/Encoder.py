@@ -38,7 +38,7 @@ class EncoderLayer(torch.nn.Module):
 
         self.self_attn = MultiHeadedAttention(dm, n_heads)
         self.pwff = PositionwiseFeedForward(dm, dff)
-        self.sublayer_connections = [SublayerConnection(dm) for _ in range(2)]
+        self.sublayer_connections = torch.nn.ModuleList([SublayerConnection(dm) for _ in range(2)])
 
     def forward(self, enc_input, enc_input_mask):
         enc_output = self.sublayer_connections[0](enc_input, lambda x: self.self_attn(x, x, x, mask=enc_input_mask))

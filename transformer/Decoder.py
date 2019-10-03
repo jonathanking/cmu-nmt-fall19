@@ -37,7 +37,7 @@ class DecoderLayer(torch.nn.Module):
         self.self_attn = MultiHeadedAttention(dm, n_heads)
         self.src_attn = MultiHeadedAttention(dm, n_heads)
         self.pwff = PositionwiseFeedForward(dm, dff)
-        self.sublayer_connections = [SublayerConnection(dm) for _ in range(3)]
+        self.sublayer_connections = torch.nn.ModuleList([SublayerConnection(dm) for _ in range(3)])
 
     def forward(self, dec_input, enc_output, tgt_mask, src_mask):
         dec_output = self.sublayer_connections[0](dec_input, lambda x: self.self_attn(x, x, x, mask=tgt_mask))
