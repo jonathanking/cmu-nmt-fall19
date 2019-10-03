@@ -60,12 +60,6 @@ class MultiHeadedAttention(torch.nn.Module):
         attn_output = attn_output.transpose(1, 2).contiguous().view(n_batch, -1, self.dm)
         return self.wo(attn_output)
 
-def subsequent_mask(length):
-    """ Returns a mask such that for position i, all positions i+1 ... dim are masked. """
-    shape = (1, length, length)
-    mask = 1 - np.triu(np.ones(shape), k=1)
-    return torch.from_numpy(mask).bool()
-
 
 if __name__ == "__main__":
     dm = 128

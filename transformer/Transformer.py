@@ -1,8 +1,8 @@
 import torch
 from .Encoder import Encoder
 from .Decoder import Decoder
-from .Attention import subsequent_mask
 
+import numpy as np
 
 class Transformer(torch.nn.Module):
     """ Transformer based model. """
@@ -24,14 +24,21 @@ class Transformer(torch.nn.Module):
         self.encoder = Encoder(self.din, dm, dff, n_heads, n_enc_layers, max_seq_len)
         self.decoder = Decoder(self.dout, dm, dff, n_heads, n_dec_layers, max_seq_len)
         self.output_projection = torch.nn.Linear(dm, self.dout)
-        self.output_softmax = torch.nn.Softmax()
+        self.output_softmax = torch.nn.Softmax(dim=-1)
 
     def forward(self, enc_input, dec_input):
         src_mask = (enc_input != self.pad_char).unsqueeze(-2)
-        tgt_mask = subsequent_mask(dec_input.shape[1])
+        tgt_mask = self.subsequent_mask(dec_input.shape[1])
         enc_output = self.encoder(enc_input, src_mask)
         dec_output = self.decoder(dec_input, enc_output, tgt_mask, src_mask)
         logits = self.output_projection(dec_output)
         return self.output_softmax(logits)
+
+    @staticmethod
+    def subsequent_mask(length):
+        """ Returns a mask such that for position i, all positions i+1 ... dim are masked. """
+        shape = (1, length, length)
+        mask = 1 - np.triu(np.ones(shape), k=1)
+        return torch.from_numpy(mask).bool()
 
 
