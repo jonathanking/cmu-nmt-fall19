@@ -29,7 +29,7 @@ Options:
     --beam-size=<int>                       beam size [default: 5]
     --lr=<float>                            learning rate [default: 0.001]
     --uniform-init=<float>                  uniformly initialize all parameters [default: 0.1]
-    --save-to=<file>                        model save path
+    --save-to=<file>                        model save path [default: ./model.chkpt]
     --valid-niter=<int>                     perform validation after how many iterations [default: 2000]
     --dropout=<float>                       dropout [default: 0.2]
     --max-decoding-time-step=<int>          maximum number of decoding time steps [default: 70]
@@ -52,10 +52,12 @@ from vocab import Vocab, VocabEntry
 sys.path.append("/transformer/")
 from transformer.Transformer import Transformer
 import torch
+from transformer.Optimizer import ScheduledOptim
+
 
 
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
-MAXLEN = 500
+MAXLEN = 175
 PAD = 0
 
 def get_onehot(ints, dim):
@@ -71,6 +73,7 @@ class NMT(object):
         self.hidden_size = hidden_size
         self.dropout_rate = dropout_rate
         self.vocab = vocab
+        self.device = device
 
         self.model = Transformer(embed_size, hidden_size, len(vocab.src.word2id), len(vocab.tgt.word2id),
                                  n_heads=8, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD, device=device)
@@ -99,7 +102,21 @@ class NMT(object):
         tgt_sents_oh = torch.LongTensor(tgt_idxs).to(self.device)
 
 
-        return probs
+        # probs = self.model(src_sents_oh, tgt_sents_oh[:, :-1])
+        # log_probs = torch.log(probs)
+        #
+        # sent_ll = torch.zeros(probs.shape[0]).to(self.device)
+        # for i in range(probs.shape[1]):             # iterate through sequence dim
+        #     tgt_wrds = tgt_sents_oh[:,i+1]          # Take the idxs of the words to predict for batch, s/w t=1
+        #     tgt_ll = log_probs[:,i, tgt_wrds][:,0]  # Extract the relevant log-likelihoods for each word.
+        #     tgt_ll[tgt_wrds==PAD] = 0               # Do not add more likelihoods if the character is a PAD
+        #     sent_ll += tgt_ll                       # Update all likelihoods
+
+        logits = self.model(src_sents_oh, tgt_sents_oh[:, :-1])
+        loss = torch.nn.functional.cross_entropy(logits.reshape(-1, len(self.vocab.tgt)), tgt_sents_oh[:,:-1].flatten(), ignore_index=0, reduction="sum")
+        return loss
+
+        # return sent_ll.mean()
 
 
     def beam_search(self, src_sent: List[str], beam_size: int=5, max_decoding_time_step: int=70) -> List[Hypothesis]:
@@ -134,6 +151,7 @@ class NMT(object):
 
         cum_loss = 0.
         cum_tgt_words = 0.
+        self.model.eval()
 
         # you may want to wrap the following code using a context manager provided
         # by the NN library to signal the backend to not to keep gradient information
@@ -142,34 +160,45 @@ class NMT(object):
         with torch.no_grad():
 
             for src_sents, tgt_sents in batch_iter(dev_data, batch_size):
-                loss = -self.model(src_sents, tgt_sents[:,:-1]).sum()
 
-                cum_loss += loss
+                loss = self(src_sents, tgt_sents)
+
+                cum_loss += float(loss)
                 tgt_word_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting the leading `<s>`
                 cum_tgt_words += tgt_word_num_to_predict
 
         ppl = np.exp(cum_loss / cum_tgt_words)
 
+        self.model.train()
+
         return ppl
 
-    @staticmethod
-    def load(model_path: str):
+    def load(self, model_path: str):
         """
         Load a pre-trained model
 
         Returns:
             model: the loaded model
         """
-        raise NotImplementedError()
+        checkpoint = torch.load(model_path)
+        model = self.model
+        try:
+            model.load_state_dict(checkpoint['model_state_dict'])
+        except RuntimeError as e:
+            print("[Info] Error loading model.")
+            print(e)
+            exit(1)
+        return model
 
-        # return model
 
     def save(self, path: str):
         """
         Save current model to file
         """
-
-        raise NotImplementedError()
+        model_state_dict = self.model.state_dict()
+        checkpoint = {'model_state_dict': model_state_dict}
+        torch.save(checkpoint, path)
+        print('\r    - [Info] The checkpoint file has been updated.')
 
 
 def compute_corpus_level_bleu_score(references: List[List[str]], hypotheses: List[Hypothesis]) -> float:
@@ -193,6 +222,7 @@ def compute_corpus_level_bleu_score(references: List[List[str]], hypotheses: Lis
 
 
 def train(args: Dict[str, str]):
+    # Data setup
     train_data_src = read_corpus(args['--train-src'], source='src')
     train_data_tgt = read_corpus(args['--train-tgt'], source='tgt')
 
@@ -222,20 +252,24 @@ def train(args: Dict[str, str]):
     hist_valid_scores = []
     train_time = begin_time = time.time()
     print('begin Maximum Likelihood training')
+    adam = torch.optim.Adam(model.model.parameters(), lr=0.2)
+    opt = ScheduledOptim(adam, int(args['--hidden-size']),2000)
 
     while True:
         epoch += 1
-
         for src_sents, tgt_sents in batch_iter(train_data, batch_size=train_batch_size, shuffle=True):
             train_iter += 1
 
             batch_size = len(src_sents)
 
             # (batch_size)
-            loss = -model(src_sents, tgt_sents)
+            loss = model(src_sents, tgt_sents)
+            opt.zero_grad()
+            loss.backward()
+            opt.step_and_update_lr()
 
-            report_loss += loss.sum()
-            cum_loss += loss.sum()
+            report_loss += float(loss)
+            cum_loss += float(loss)
 
             tgt_words_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting leading `<s>`
             report_tgt_words += tgt_words_num_to_predict
@@ -303,7 +337,7 @@ def train(args: Dict[str, str]):
                         print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
 
                         # load model
-                        model_save_path
+                        model.load(model_save_path)
 
                         print('restore parameters of the optimizers', file=sys.stderr)
                         # You may also need to load the state of the optimizer saved before
@@ -364,6 +398,7 @@ def main():
     # also want to seed the RNG of tensorflow, pytorch, dynet, etc.
     seed = int(args['--seed'])
     np.random.seed(seed * 13 // 7)
+    torch.manual_seed(seed * 13 // 7)
 
     if args['train']:
         train(args)
