@@ -167,24 +167,23 @@ class NMT(object):
         with torch.no_grad():
             src_idxs = self.vocab.src.words2indices(src_sent, MAXLEN)
             src_sents_oh = torch.LongTensor(src_idxs).to(self.device)
-            predictions = [self.tgt.word2id['<s>']]
+            predictions = [torch.tensor(self.vocab.tgt.word2id['<s>']).long().to(self.device)]
             ll = 0
             word = None
             counter = 0
             while word != self.vocab.tgt.word2id['</s>'] and counter < max_decoding_time_step:
                 dec_input = torch.stack(predictions)
-                logits = self.model(src_sents_oh, dec_input)
-                word_prob, word = logits[-1].max()
+                logits = self.model(src_sents_oh.unsqueeze(dim=0), dec_input.unsqueeze(dim=0))
+                word_prob, word = torch.max(logits[0,-1], dim=-1)
                 ll += torch.log(word_prob)
                 predictions.append(word)
                 counter += 1
-        decoded_sent = [self.vocab.tgt.id2word(p) for p in predictions[1:-1]]
+        decoded_sent = [self.vocab.tgt.id2word[int(p)] for p in predictions[1:-1]]
         hypothesis = Hypothesis(decoded_sent, ll)
         return hypothesis
 
-
-
-    def load(self, model_path: str):
+    @staticmethod
+    def load(model_path):
         """
         Load a pre-trained model
 
@@ -192,9 +191,13 @@ class NMT(object):
             model: the loaded model
         """
         checkpoint = torch.load(model_path)
-        model = self.model
+        vocab = pickle.load(open("data/vocab.bin", 'rb'))
+        model = NMT(embed_size=256,
+                    hidden_size=256,
+                    dropout_rate=0.1,
+                    vocab=vocab, device=torch.device('cuda'))
         try:
-            model.load_state_dict(checkpoint['model_state_dict'])
+            model.model.load_state_dict(checkpoint['model_state_dict'])
         except RuntimeError as e:
             print("[Info] Error loading model.")
             print(e)
