@@ -7,7 +7,7 @@ import numpy as np
 class Transformer(torch.nn.Module):
     """ Transformer based model. """
     # TODO implement dropout for all layers
-
+    # TODO can passing in device be avoided? Seems necessary for P.enc./mask sublayers
     def __init__(self, dm, dff, din, dout, n_heads, n_enc_layers, n_dec_layers, max_seq_len, pad_char, device):
         super(Transformer, self).__init__()
         self.din = din
@@ -33,7 +33,6 @@ class Transformer(torch.nn.Module):
         dec_output = self.decoder(dec_input, enc_output, tgt_mask, src_mask)
         logits = self.output_projection(dec_output)
         return logits
-        # return self.output_softmax(logits)
 
     def subsequent_mask(self, length):
         """ Returns a mask such that for position i, all positions i+1 ... dim are masked. """

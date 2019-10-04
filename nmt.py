@@ -55,14 +55,10 @@ import torch
 from transformer.Optimizer import ScheduledOptim
 
 
-
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 MAXLEN = 175
 PAD = 0
 
-def get_onehot(ints, dim):
-    y = torch.eye(dim).long()
-    return y[ints]
 
 class NMT(object):
 
@@ -78,7 +74,6 @@ class NMT(object):
         self.model = Transformer(embed_size, hidden_size, len(vocab.src.word2id), len(vocab.tgt.word2id),
                                  n_heads=8, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD, device=device)
         self.model.to(device)
-        # print(self.model)
         print(f"{sum(p.numel() for p in self.model.parameters())} parameters.")
 
 
@@ -101,22 +96,17 @@ class NMT(object):
         src_sents_oh = torch.LongTensor(src_idxs).to(self.device)
         tgt_sents_oh = torch.LongTensor(tgt_idxs).to(self.device)
 
-
-        # probs = self.model(src_sents_oh, tgt_sents_oh[:, :-1])
-        # log_probs = torch.log(probs)
+        # preds_so_far = torch.zeros(src_sents_oh.shape[0], MAXLEN).long().to(self.device)
         #
-        # sent_ll = torch.zeros(probs.shape[0]).to(self.device)
-        # for i in range(probs.shape[1]):             # iterate through sequence dim
-        #     tgt_wrds = tgt_sents_oh[:,i+1]          # Take the idxs of the words to predict for batch, s/w t=1
-        #     tgt_ll = log_probs[:,i, tgt_wrds][:,0]  # Extract the relevant log-likelihoods for each word.
-        #     tgt_ll[tgt_wrds==PAD] = 0               # Do not add more likelihoods if the character is a PAD
-        #     sent_ll += tgt_ll                       # Update all likelihoods
+        # preds_so_far[:, 0:1] = self.model(src_sents_oh, tgt_sents_oh[:, 0:1]).argmax(dim=-1)
+        # for i in range(1, MAXLEN):
+        #     logits = self.model(src_sents_oh, preds_so_far[:,:i])
+        #     preds_so_far[:,i] = logits[:,-1].argmax(dim=-1)
+        #     preds_so_far[:,i] *= (preds_so_far[:, i-1] != 0).long().to(self.device)
 
         logits = self.model(src_sents_oh, tgt_sents_oh[:, :-1])
-        loss = torch.nn.functional.cross_entropy(logits.reshape(-1, len(self.vocab.tgt)), tgt_sents_oh[:,:-1].flatten(), ignore_index=0, reduction="sum")
+        loss = torch.nn.functional.cross_entropy(logits.reshape(-1, len(self.vocab.tgt)), tgt_sents_oh[:,1:].flatten(), ignore_index=0, reduction="sum")
         return loss
-
-        # return sent_ll.mean()
 
 
     def beam_search(self, src_sent: List[str], beam_size: int=5, max_decoding_time_step: int=70) -> List[Hypothesis]:
@@ -172,6 +162,27 @@ class NMT(object):
         self.model.train()
 
         return ppl
+
+    def greedy_decode(self, src_sent, max_decoding_time_step=70):
+        with torch.no_grad():
+            src_idxs = self.vocab.src.words2indices(src_sent, MAXLEN)
+            src_sents_oh = torch.LongTensor(src_idxs).to(self.device)
+            predictions = [self.tgt.word2id['<s>']]
+            ll = 0
+            word = None
+            counter = 0
+            while word != self.vocab.tgt.word2id['</s>'] and counter < max_decoding_time_step:
+                dec_input = torch.stack(predictions)
+                logits = self.model(src_sents_oh, dec_input)
+                word_prob, word = logits[-1].max()
+                ll += torch.log(word_prob)
+                predictions.append(word)
+                counter += 1
+        decoded_sent = [self.vocab.tgt.id2word(p) for p in predictions[1:-1]]
+        hypothesis = Hypothesis(decoded_sent, ll)
+        return hypothesis
+
+
 
     def load(self, model_path: str):
         """
@@ -252,7 +263,8 @@ def train(args: Dict[str, str]):
     hist_valid_scores = []
     train_time = begin_time = time.time()
     print('begin Maximum Likelihood training')
-    adam = torch.optim.Adam(model.model.parameters(), lr=0.2)
+    lr = 0.2
+    adam = torch.optim.Adam(model.model.parameters(), lr=lr)
     opt = ScheduledOptim(adam, int(args['--hidden-size']),2000)
 
     while True:
@@ -261,8 +273,6 @@ def train(args: Dict[str, str]):
             train_iter += 1
 
             batch_size = len(src_sents)
-
-            # (batch_size)
             loss = model(src_sents, tgt_sents)
             opt.zero_grad()
             loss.backward()
@@ -362,6 +372,15 @@ def beam_search(model: NMT, test_data_src: List[List[str]], beam_size: int, max_
     return hypotheses
 
 
+def greedy_decode(model, test_data_src, max_decoding_time_step):
+    hypotheses = []
+    for src_sent in tqdm(test_data_src, desc='Decoding', file=sys.stdout):
+        hyp = model.greedy_decode(src_sent, max_decoding_time_step=max_decoding_time_step)
+        hypotheses.append(hyp)
+
+    return hypotheses
+
+
 def decode(args: Dict[str, str]):
     """
     performs decoding on a test set, and save the best-scoring decoding results. 
@@ -375,17 +394,14 @@ def decode(args: Dict[str, str]):
     print(f"load model from {args['MODEL_PATH']}", file=sys.stderr)
     model = NMT.load(args['MODEL_PATH'])
 
-    hypotheses = beam_search(model, test_data_src,
-                             beam_size=int(args['--beam-size']),
-                             max_decoding_time_step=int(args['--max-decoding-time-step']))
+    top_hypotheses = greedy_decode(model, test_data_src, int(args['--max-decoding-time-step']))
 
     if args['TEST_TARGET_FILE']:
-        top_hypotheses = [hyps[0] for hyps in hypotheses]
         bleu_score = compute_corpus_level_bleu_score(test_data_tgt, top_hypotheses)
         print(f'Corpus BLEU: {bleu_score}', file=sys.stderr)
 
     with open(args['OUTPUT_FILE'], 'w') as f:
-        for src_sent, hyps in zip(test_data_src, hypotheses):
+        for src_sent, hyps in zip(test_data_src, top_hypotheses):
             top_hyp = hyps[0]
             hyp_sent = ' '.join(top_hyp.value)
             f.write(hyp_sent + '\n')
