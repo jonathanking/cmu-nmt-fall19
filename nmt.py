@@ -64,7 +64,7 @@ def get_onehot(ints, dim):
 
 class NMT(object):
 
-    def __init__(self, embed_size, hidden_size, vocab, dropout_rate=0.2):
+    def __init__(self, embed_size, hidden_size, vocab, dropout_rate=0.2, device=torch.device('cpu')):
         super(NMT, self).__init__()
 
         self.embed_size = embed_size
@@ -72,7 +72,11 @@ class NMT(object):
         self.dropout_rate = dropout_rate
         self.vocab = vocab
 
-        self.model = Transformer(embed_size, hidden_size, len(vocab.src.word2id), len(vocab.tgt.word2id), n_heads=8, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD)
+        self.model = Transformer(embed_size, hidden_size, len(vocab.src.word2id), len(vocab.tgt.word2id),
+                                 n_heads=8, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD, device=device)
+        self.model.to(device)
+        # print(self.model)
+        print(f"{sum(p.numel() for p in self.model.parameters())} parameters.")
 
 
     def __call__(self, src_sents: List[List[str]], tgt_sents: List[List[str]]):
@@ -91,15 +95,9 @@ class NMT(object):
         """
         src_idxs = self.vocab.src.words2indices(src_sents, MAXLEN)
         tgt_idxs = self.vocab.tgt.words2indices(tgt_sents, MAXLEN)
-        src_sents_oh = torch.LongTensor(src_idxs)
-        tgt_sents_oh = torch.LongTensor(tgt_idxs)
-        output = self.model(src_sents_oh, tgt_sents_oh[:, :-1])
-        log_output = torch.log(output)
-        probs = torch.zeros(output.shape[0])
-        for i in range(output.shape[1]): # iterate through sequence dim
-            tgt_wrds = tgt_sents_oh[:,i]
-            tgt_ll = log_output[:,i, tgt_wrds][:,0]
-            probs += tgt_ll
+        src_sents_oh = torch.LongTensor(src_idxs).to(self.device)
+        tgt_sents_oh = torch.LongTensor(tgt_idxs).to(self.device)
+
 
         return probs
 
@@ -212,10 +210,11 @@ def train(args: Dict[str, str]):
 
     vocab = pickle.load(open(args['--vocab'], 'rb'))
 
+    # Model setup
     model = NMT(embed_size=int(args['--embed-size']),
                 hidden_size=int(args['--hidden-size']),
                 dropout_rate=float(args['--dropout']),
-                vocab=vocab)
+                vocab=vocab, device=torch.device('cuda') if bool(args['--cuda']) else torch.device('cpu'))
 
     num_trial = 0
     train_iter = patience = cum_loss = report_loss = cumulative_tgt_words = report_tgt_words = 0

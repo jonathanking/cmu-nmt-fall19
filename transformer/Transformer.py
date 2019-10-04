@@ -8,7 +8,7 @@ class Transformer(torch.nn.Module):
     """ Transformer based model. """
     # TODO implement dropout for all layers
 
-    def __init__(self, dm, dff, din, dout, n_heads, n_enc_layers, n_dec_layers, max_seq_len, pad_char):
+    def __init__(self, dm, dff, din, dout, n_heads, n_enc_layers, n_dec_layers, max_seq_len, pad_char, device):
         super(Transformer, self).__init__()
         self.din = din
         self.dout = dout
@@ -19,10 +19,10 @@ class Transformer(torch.nn.Module):
         self.n_dec_laers = n_dec_layers
         self.max_seq_len = max_seq_len
         self.pad_char = pad_char
+        self.device = device
 
-
-        self.encoder = Encoder(self.din, dm, dff, n_heads, n_enc_layers, max_seq_len)
-        self.decoder = Decoder(self.dout, dm, dff, n_heads, n_dec_layers, max_seq_len)
+        self.encoder = Encoder(self.din, dm, dff, n_heads, n_enc_layers, max_seq_len, device)
+        self.decoder = Decoder(self.dout, dm, dff, n_heads, n_dec_layers, max_seq_len, device)
         self.output_projection = torch.nn.Linear(dm, self.dout)
         self.output_softmax = torch.nn.Softmax(dim=-1)
 
@@ -32,13 +32,13 @@ class Transformer(torch.nn.Module):
         enc_output = self.encoder(enc_input, src_mask)
         dec_output = self.decoder(dec_input, enc_output, tgt_mask, src_mask)
         logits = self.output_projection(dec_output)
-        return self.output_softmax(logits)
+        return logits
+        # return self.output_softmax(logits)
 
-    @staticmethod
-    def subsequent_mask(length):
+    def subsequent_mask(self, length):
         """ Returns a mask such that for position i, all positions i+1 ... dim are masked. """
         shape = (1, length, length)
         mask = 1 - np.triu(np.ones(shape), k=1)
-        return torch.from_numpy(mask).bool().cuda()
+        return torch.from_numpy(mask).bool().to(self.device)
 
 

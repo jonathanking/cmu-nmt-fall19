@@ -5,7 +5,7 @@ from .Attention import MultiHeadedAttention
 class Encoder(torch.nn.Module):
     """ Transformer encoder model. """
 
-    def __init__(self, din, dm, dff, n_heads, n_enc_layers, max_seq_len):
+    def __init__(self, din, dm, dff, n_heads, n_enc_layers, max_seq_len, device):
         super(Encoder, self).__init__()
         self.din = din
         self.dm = dm
@@ -15,7 +15,7 @@ class Encoder(torch.nn.Module):
         self.max_seq_len = max_seq_len
 
         self.input_embedding = torch.nn.Embedding(self.din, self.dm)
-        self.positional_enc = PositionalEncoding(dm, max_seq_len)
+        self.positional_enc = PositionalEncoding(dm, max_seq_len, device)
 
         self.enc_layers = torch.nn.ModuleList([EncoderLayer(dm, dff, n_heads) for _ in range(self.n_enc_layers)])
 

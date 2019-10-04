@@ -34,11 +34,11 @@ class PositionwiseFeedForward(torch.nn.Module):
 class PositionalEncoding(torch.nn.Module):
     """ Positional encoding layer for the Transformer model.
     """
-    def __init__(self, dm, max_seq_len):
+    def __init__(self, dm, max_seq_len, device):
         super(PositionalEncoding, self).__init__()
         self.dm = dm
         self.max_seq_len = max_seq_len
-        self.pos_encodings = self.create_encodings().cuda()
+        self.pos_encodings = self.create_encodings().to(device)
 
     def forward(self, seq):
         return self.pos_encodings[0:seq.shape[1]]
