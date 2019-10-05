@@ -8,19 +8,21 @@ class ScaledDotProductAttention(torch.nn.Module):
         super(ScaledDotProductAttention, self).__init__()
         self.softmax = torch.nn.Softmax(dim=-1)
 
-    def forward(self, Q, K, V, mask=None):
+    def forward(self, Q, K, V, mask=None, dropout=None):
         scores = torch.matmul(Q, K.transpose(-2, -1))
         scores = scores / np.sqrt(K.shape[-1])
         if mask is not None:
             scores = scores.masked_fill(mask == 0, -np.inf)
         scores = self.softmax(scores)
+        if dropout is not None:
+            scores = dropout(scores)
         return torch.matmul(scores, V), scores
 
 class MultiHeadedAttention(torch.nn.Module):
     """ Multi-headed attention layer for the Transformer model. Wraps ScaledDotProductAttention.
         Assumes n_heads are applied by splitting up model in to n_heads, each of size dm / n_heads.
         Guided by http://nlp.seas.harvard.edu/2018/04/03/attention.html"""
-    def __init__(self, dm, n_heads):
+    def __init__(self, dm, n_heads, dropout=0.1):
         super(MultiHeadedAttention, self).__init__()
         assert dm % n_heads == 0, "The dimension of the model must be evenly divisible by the number of attn heads."
         self.dm = dm
@@ -34,6 +36,7 @@ class MultiHeadedAttention(torch.nn.Module):
 
         self.attn_scores = None
         self.attn = ScaledDotProductAttention()
+        self.dropout = torch.nn.Dropout(dropout)
 
     def forward(self, preQ, preK, preV, mask=None):
         n_batch = preQ.shape[0]
@@ -49,7 +52,7 @@ class MultiHeadedAttention(torch.nn.Module):
         # Apply scaled dot-product attention across batch, head dims. Add head dim to mask for broadcasting.
         # attn_output               = [ n_batch x n_heads x L x dk ]
         mask = mask.unsqueeze(1) if mask is not None else None
-        attn_output, self.attn_scores = self.attn(Q, K, V, mask)
+        attn_output, self.attn_scores = self.attn(Q, K, V, mask, self.dropout)
 
         # Concatenate output from attn heads
         # attn_output.transpose     = [ n_batch x L x n_heads x dk ]

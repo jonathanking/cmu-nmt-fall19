@@ -72,7 +72,7 @@ class NMT(object):
         self.device = device
 
         self.model = Transformer(embed_size, hidden_size, len(vocab.src.word2id), len(vocab.tgt.word2id),
-                                 n_heads=8, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD, device=device)
+                                 n_heads=8, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD, device = device)
         self.model.to(device)
         print(f"{sum(p.numel() for p in self.model.parameters())} parameters.")
 

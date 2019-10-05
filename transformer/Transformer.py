@@ -8,7 +8,7 @@ class Transformer(torch.nn.Module):
     """ Transformer based model. """
     # TODO implement dropout for all layers
     # TODO can passing in device be avoided? Seems necessary for P.enc./mask sublayers
-    def __init__(self, dm, dff, din, dout, n_heads, n_enc_layers, n_dec_layers, max_seq_len, pad_char, device):
+    def __init__(self, dm, dff, din, dout, n_heads, n_enc_layers, n_dec_layers, max_seq_len, pad_char, device, dropout=0.1):
         super(Transformer, self).__init__()
         self.din = din
         self.dout = dout
@@ -21,8 +21,8 @@ class Transformer(torch.nn.Module):
         self.pad_char = pad_char
         self.device = device
 
-        self.encoder = Encoder(self.din, dm, dff, n_heads, n_enc_layers, max_seq_len, device)
-        self.decoder = Decoder(self.dout, dm, dff, n_heads, n_dec_layers, max_seq_len, device)
+        self.encoder = Encoder(self.din, dm, dff, n_heads, n_enc_layers, max_seq_len, dropout)
+        self.decoder = Decoder(self.dout, dm, dff, n_heads, n_dec_layers, max_seq_len, dropout)
         self.output_projection = torch.nn.Linear(dm, self.dout)
         self.output_softmax = torch.nn.Softmax(dim=-1)
 
