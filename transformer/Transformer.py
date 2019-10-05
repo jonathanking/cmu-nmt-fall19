@@ -22,10 +22,10 @@ class Transformer(torch.nn.Module):
         self.encoder = Encoder(self.din, dm, dff, n_heads, n_enc_layers, max_seq_len, dropout)
         self.decoder = Decoder(self.dout, dm, dff, n_heads, n_dec_layers, max_seq_len, dropout)
         self.output_projection = torch.nn.Linear(dm, self.dout)
-        self.output_softmax = torch.nn.Softmax(dim=-1)
         self._init_parameters()
 
     def forward(self, enc_input, dec_input):
+        # TODO why are masks created in/outside of the transformer?
         src_mask = (enc_input != self.pad_char).unsqueeze(-2)
         tgt_mask = (dec_input != self.pad_char).unsqueeze(-2) & self.subsequent_mask(dec_input.shape[1])
         enc_output = self.encoder(enc_input, src_mask)
