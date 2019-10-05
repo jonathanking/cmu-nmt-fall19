@@ -95,15 +95,6 @@ class NMT(object):
         tgt_idxs = self.vocab.tgt.words2indices(tgt_sents, MAXLEN)
         src_sents_oh = torch.LongTensor(src_idxs).to(self.device)
         tgt_sents_oh = torch.LongTensor(tgt_idxs).to(self.device)
-
-        # preds_so_far = torch.zeros(src_sents_oh.shape[0], MAXLEN).long().to(self.device)
-        #
-        # preds_so_far[:, 0:1] = self.model(src_sents_oh, tgt_sents_oh[:, 0:1]).argmax(dim=-1)
-        # for i in range(1, MAXLEN):
-        #     logits = self.model(src_sents_oh, preds_so_far[:,:i])
-        #     preds_so_far[:,i] = logits[:,-1].argmax(dim=-1)
-        #     preds_so_far[:,i] *= (preds_so_far[:, i-1] != 0).long().to(self.device)
-
         logits = self.model(src_sents_oh, tgt_sents_oh[:, :-1])
         loss = torch.nn.functional.cross_entropy(logits.reshape(-1, len(self.vocab.tgt)), tgt_sents_oh[:,1:].flatten(), ignore_index=0, reduction="sum")
         return loss
@@ -380,7 +371,6 @@ def greedy_decode(model, test_data_src, max_decoding_time_step):
     for src_sent in tqdm(test_data_src, desc='Decoding', file=sys.stdout):
         hyp = model.greedy_decode(src_sent, max_decoding_time_step=max_decoding_time_step)
         hypotheses.append(hyp)
-
     return hypotheses
 
 
@@ -396,16 +386,15 @@ def decode(args: Dict[str, str]):
 
     print(f"load model from {args['MODEL_PATH']}", file=sys.stderr)
     model = NMT.load(args['MODEL_PATH'])
-
-    top_hypotheses = greedy_decode(model, test_data_src, int(args['--max-decoding-time-step']))
+    limit = None
+    top_hypotheses = greedy_decode(model, test_data_src[:limit], int(args['--max-decoding-time-step']))
 
     if args['TEST_TARGET_FILE']:
-        bleu_score = compute_corpus_level_bleu_score(test_data_tgt, top_hypotheses)
+        bleu_score = compute_corpus_level_bleu_score(test_data_tgt[:limit], top_hypotheses)
         print(f'Corpus BLEU: {bleu_score}', file=sys.stderr)
 
     with open(args['OUTPUT_FILE'], 'w') as f:
-        for src_sent, hyps in zip(test_data_src, top_hypotheses):
-            top_hyp = hyps[0]
+        for src_sent, top_hyp in zip(test_data_src[:limit], top_hypotheses):
             hyp_sent = ' '.join(top_hyp.value)
             f.write(hyp_sent + '\n')
 
