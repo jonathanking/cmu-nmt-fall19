@@ -32,3 +32,12 @@ class ScheduledOptim():
 
         for param_group in self._optimizer.param_groups:
             param_group['lr'] = lr
+
+    def state_dict(self):
+        return (self._optimizer.state_dict(), self.n_warmup_steps, self.n_current_steps, self.init_lr)
+
+    def load_state_dict(self, d):
+        self._optimizer.load_state_dict(d[0])
+        self.n_warmup_steps = d[1]
+        self.n_current_steps = d[2]
+        self.init_lr = d[3]

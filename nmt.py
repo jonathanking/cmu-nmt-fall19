@@ -29,7 +29,7 @@ Options:
     --beam-size=<int>                       beam size [default: 5]
     --lr=<float>                            learning rate [default: 0.001]
     --uniform-init=<float>                  uniformly initialize all parameters [default: 0.1]
-    --save-to=<file>                        model save path [default: ./model.chkpt]
+    --save-to=<file>                        model save path [default: ./chkpts/model.chkpt]
     --valid-niter=<int>                     perform validation after how many iterations [default: 2000]
     --dropout=<float>                       dropout [default: 0.2]
     --max-decoding-time-step=<int>          maximum number of decoding time steps [default: 70]
@@ -70,8 +70,8 @@ class NMT(object):
         self.dropout_rate = dropout_rate
         self.vocab = vocab
         self.device = device
-        self.model = Transformer(embed_size*2, hidden_size*2, len(vocab.src.word2id), len(vocab.tgt.word2id),
-                                 n_heads=8*2, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD, device = device)
+        self.model = Transformer(embed_size, hidden_size, len(vocab.src.word2id), len(vocab.tgt.word2id),
+                                 n_heads=16, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD, device = device)
         self.model.to(device)
         print(f"{sum(p.numel() for p in self.model.parameters())} parameters.")
 
@@ -183,7 +183,7 @@ class NMT(object):
         checkpoint = torch.load(model_path)
         vocab = pickle.load(open("data/vocab.bin", 'rb'))
         model = NMT(embed_size=1024,
-                    hidden_size=2048,
+                    hidden_size=4096,
                     dropout_rate=0.1,
                     vocab=vocab, device=torch.device('cuda'))
         adam = torch.optim.Adam(model.model.parameters(), lr=0.2, betas=(0.9, 0.998))
@@ -256,7 +256,7 @@ def train(args: Dict[str, str]):
                 dropout_rate=float(args['--dropout']),
                 vocab=vocab, device=torch.device('cuda') if bool(args['--cuda']) else torch.device('cpu'))
 
-    # model = NMT.load("model.chkpt")
+    # model, opt = NMT.load("chkpts/model.chkpt")
 
     num_trial = 0
     train_iter = patience = cum_loss = report_loss = cumulative_tgt_words = report_tgt_words = 0
