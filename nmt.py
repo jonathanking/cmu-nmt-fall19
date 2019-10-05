@@ -56,7 +56,7 @@ from transformer.Optimizer import ScheduledOptim
 
 
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
-MAXLEN = 175
+MAXLEN = 150
 PAD = 0
 
 
@@ -70,9 +70,8 @@ class NMT(object):
         self.dropout_rate = dropout_rate
         self.vocab = vocab
         self.device = device
-
-        self.model = Transformer(embed_size, hidden_size, len(vocab.src.word2id), len(vocab.tgt.word2id),
-                                 n_heads=8, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD, device = device)
+        self.model = Transformer(embed_size*2, hidden_size*2, len(vocab.src.word2id), len(vocab.tgt.word2id),
+                                 n_heads=8*2, n_dec_layers=6, n_enc_layers=6, max_seq_len=MAXLEN, pad_char=PAD, device = device)
         self.model.to(device)
         print(f"{sum(p.numel() for p in self.model.parameters())} parameters.")
 
@@ -258,8 +257,8 @@ def train(args: Dict[str, str]):
     train_time = begin_time = time.time()
     print('begin Maximum Likelihood training')
     lr = 0.2
-    adam = torch.optim.Adam(model.model.parameters(), lr=lr)
-    opt = ScheduledOptim(adam, int(args['--hidden-size']),2000)
+    adam = torch.optim.Adam(model.model.parameters(), lr=lr, betas=(0.9, 0.998))
+    opt = ScheduledOptim(adam, int(args['--hidden-size']),16000)
 
     while True:
         epoch += 1
