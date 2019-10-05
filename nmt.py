@@ -182,25 +182,31 @@ class NMT(object):
         """
         checkpoint = torch.load(model_path)
         vocab = pickle.load(open("data/vocab.bin", 'rb'))
-        model = NMT(embed_size=256,
-                    hidden_size=256,
+        model = NMT(embed_size=1024,
+                    hidden_size=2048,
                     dropout_rate=0.1,
                     vocab=vocab, device=torch.device('cuda'))
+        adam = torch.optim.Adam(model.model.parameters(), lr=0.2, betas=(0.9, 0.998))
+        opt = ScheduledOptim(adam, 1024, 16000)
+
         try:
             model.model.load_state_dict(checkpoint['model_state_dict'])
+            opt.load_state_dict(checkpoint['opt_state_dict'])
         except RuntimeError as e:
             print("[Info] Error loading model.")
             print(e)
             exit(1)
-        return model
+        return model, opt
 
 
-    def save(self, path: str):
+    def save(self, path: str, optimizer):
         """
         Save current model to file
         """
         model_state_dict = self.model.state_dict()
-        checkpoint = {'model_state_dict': model_state_dict}
+        opt_state_dict = optimizer.state_dict()
+        checkpoint = {'model_state_dict': model_state_dict,
+                      'opt_state_dict': opt_state_dict}
         torch.save(checkpoint, path)
         print('\r    - [Info] The checkpoint file has been updated.')
 
@@ -250,6 +256,8 @@ def train(args: Dict[str, str]):
                 dropout_rate=float(args['--dropout']),
                 vocab=vocab, device=torch.device('cuda') if bool(args['--cuda']) else torch.device('cpu'))
 
+    # model = NMT.load("model.chkpt")
+
     num_trial = 0
     train_iter = patience = cum_loss = report_loss = cumulative_tgt_words = report_tgt_words = 0
     cumulative_examples = report_examples = epoch = valid_num = 0
@@ -258,7 +266,7 @@ def train(args: Dict[str, str]):
     print('begin Maximum Likelihood training')
     lr = 0.2
     adam = torch.optim.Adam(model.model.parameters(), lr=lr, betas=(0.9, 0.998))
-    opt = ScheduledOptim(adam, int(args['--hidden-size']),16000)
+    opt = ScheduledOptim(adam, 1024, 16000)
 
     while True:
         epoch += 1
@@ -321,7 +329,7 @@ def train(args: Dict[str, str]):
                 if is_better:
                     patience = 0
                     print('save currently the best model to [%s]' % model_save_path, file=sys.stderr)
-                    model.save(model_save_path)
+                    model.save(model_save_path, opt)
 
                     # You may also save the optimizer's state
                 elif patience < int(args['--patience']):
@@ -340,7 +348,7 @@ def train(args: Dict[str, str]):
                         print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
 
                         # load model
-                        model.load(model_save_path)
+                        model, opt = model.load(model_save_path)
 
                         print('restore parameters of the optimizers', file=sys.stderr)
                         # You may also need to load the state of the optimizer saved before
