@@ -375,10 +375,15 @@ def beam_search(model: NMT, test_data_src: List[List[str]], beam_size: int, max_
 
 def greedy_decode(model, test_data_src, max_decoding_time_step):
     hypotheses = []
-    for src_sent in tqdm(test_data_src, desc='Decoding', file=sys.stdout):
-        hyp = model.greedy_decode(src_sent, max_decoding_time_step=max_decoding_time_step)
-        hypotheses.append(hyp)
-    return hypotheses
+    real = []
+    for i, src_sent in enumerate(tqdm(test_data_src, desc='Decoding', file=sys.stdout)):
+        try:
+            hyp = model.greedy_decode(src_sent, max_decoding_time_step=max_decoding_time_step)
+            hypotheses.append(hyp)
+            real.append(i)
+        except RuntimeError:
+            continue
+    return hypotheses, real
 
 
 def decode(args: Dict[str, str]):
@@ -392,9 +397,10 @@ def decode(args: Dict[str, str]):
         test_data_tgt = read_corpus(args['TEST_TARGET_FILE'], source='tgt')
 
     print(f"load model from {args['MODEL_PATH']}", file=sys.stderr)
-    model = NMT.load(args['MODEL_PATH'])
+    model, _ = NMT.load(args['MODEL_PATH'])
     limit = None
-    top_hypotheses = greedy_decode(model, test_data_src[:limit], int(args['--max-decoding-time-step']))
+    top_hypotheses, real_idxs = greedy_decode(model, test_data_src[:limit], int(args['--max-decoding-time-step']))
+    test_data_tgt = [test_data_tgt[i] for i in real_idxs]
 
     if args['TEST_TARGET_FILE']:
         bleu_score = compute_corpus_level_bleu_score(test_data_tgt[:limit], top_hypotheses)
